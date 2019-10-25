@@ -1,12 +1,13 @@
 package file
 
 import (
-	"github.com/cnlh/nps/lib/rate"
-	"github.com/pkg/errors"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/cnlh/nps/lib/rate"
+	"github.com/pkg/errors"
 )
 
 type Flow struct {
@@ -48,6 +49,7 @@ type Client struct {
 	WebUserName     string     //the username of web login
 	WebPassword     string     //the password of web login
 	ConfigConnAllow bool       //is allow connected by config file
+	MaxTunnelNum    int
 	sync.RWMutex
 }
 
@@ -97,6 +99,17 @@ func (s *Client) HasTunnel(t *Tunnel) (exist bool) {
 	return
 }
 
+func (s *Client) GetTunnelNum() (num int) {
+	GetDb().JsonDb.Tasks.Range(func(key, value interface{}) bool {
+		v := value.(*Tunnel)
+		if v.Client.Id == s.Id {
+			num++
+		}
+		return true
+	})
+	return
+}
+
 func (s *Client) HasHost(h *Host) bool {
 	var has bool
 	GetDb().JsonDb.Hosts.Range(func(key, value interface{}) bool {
@@ -111,22 +124,23 @@ func (s *Client) HasHost(h *Host) bool {
 }
 
 type Tunnel struct {
-	Id         int
-	Port       int
-	ServerIp   string
-	Mode       string
-	Status     bool
-	RunStatus  bool
-	Client     *Client
-	Ports      string
-	Flow       *Flow
-	Password   string
-	Remark     string
-	TargetAddr string
-	NoStore    bool
-	LocalPath  string
-	StripPre   string
-	Target     *Target
+	Id           int
+	Port         int
+	ServerIp     string
+	Mode         string
+	Status       bool
+	RunStatus    bool
+	Client       *Client
+	Ports        string
+	Flow         *Flow
+	Password     string
+	Remark       string
+	TargetAddr   string
+	NoStore      bool
+	LocalPath    string
+	StripPre     string
+	Target       *Target
+	MultiAccount *MultiAccount
 	Health
 	sync.RWMutex
 }
@@ -164,10 +178,15 @@ type Host struct {
 }
 
 type Target struct {
-	nowIndex  int
-	TargetStr string
-	TargetArr []string
+	nowIndex   int
+	TargetStr  string
+	TargetArr  []string
+	LocalProxy bool
 	sync.RWMutex
+}
+
+type MultiAccount struct {
+	AccountMap map[string]string // multi account and pwd
 }
 
 func (s *Target) GetRandomTarget() (string, error) {
